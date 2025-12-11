@@ -4,8 +4,8 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from openai import OpenAI
 
-# ====== НАСТРОЙКИ (ВСТАВЬ СВОИ КЛЮЧИ) ======
-TELEGRAM_BOT_TOKEN = "8583142764:AAGJyxihIApSXnf0KL1SuCRXHOGkPKGv0sQ"
+# ====== НАСТРОЙКИ (КЛЮЧИ И ТОКЕНЫ ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ) ======
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 client = OpenAI(api_key=OPENAI_API_KEY)
@@ -19,7 +19,9 @@ logger = logging.getLogger(__name__)
 
 # ====== СИСТЕМНОЕ СООБЩЕНИЕ ДЛЯ КАМИ ======
 SYSTEM_PROMPT = """
-Ты — ИИ-помощница по имени Камила (Ками). Общайся на русском языке, в женском роде, вежливо и дружелюбно.
+Ты — ИИ-помощница по имени Камила (Ками). Общайся на РУССКОМ языке, в женском роде, вежливо и дружелюбно.
+Отвечай ВСЕГДА на русском языке, даже если пользователь пишет на другом языке.
+
 Обращайся к пользователю как «Сохиб ака», если он не просит иначе.
 
 Пользователь — специалист по таможенному оформлению в Узбекистане, работает в Ташкенте.
@@ -33,12 +35,13 @@ SYSTEM_PROMPT = """
 6) В спорных случаях приводить альтернативные коды и объяснять, почему они не подходят.
 
 Если сообщение не похоже на товар, отвечай как обычный ассистент (Камила).
+Отвечай развёрнуто, простым языком и всегда объясняй логику.
 """
 
 # ====== ОБРАБОТЧИК КОМАНД ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-        "Ассалому алейкум, Сохиб ака! ??\n\n"
+        "Ассалому алейкум, Сохиб ака!\n\n"
         "Я Камила, твой ИИ-помощник.\n"
         "Просто отправь мне название товара (можно на английском) — "
         "и я дам описание, функции, HS-код и обоснование."
@@ -53,7 +56,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         completion = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "Ты умный, очень подробный помощник Сохиба, специалиста по таможенному оформлению. Отвечай развёрнуто, простым языком, всегда объясняй логику. Если вопрос про товар, дай описание и функции. Если можно – предложи пример формулировки для таможенной декларации."},
+                {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_text},
             ],
             temperature=0.2,
@@ -64,10 +67,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         logger.error(f"Ошибка при обращении к OpenAI: {e}")
-        await update.message.reply_text("Произошла ошибка при обращении к ИИ. Попробуй ещё раз позже, Сохиб ака.")
+        await update.message.reply_text(
+            "Произошла ошибка при обращении к ИИ. Попробуй ещё раз позже, Сохиб ака."
+        )
 
 # ====== ЗАПУСК БОТА ======
 def main():
+    if not TELEGRAM_BOT_TOKEN:
+        raise RuntimeError("TELEGRAM_BOT_TOKEN не задан в переменных окружения")
+
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
